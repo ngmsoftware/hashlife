@@ -1,4 +1,4 @@
-# WILL to SVG
+# Hashlife
 
 Python program that implements the Hashlife algorithm 
 
