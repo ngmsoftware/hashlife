@@ -1,0 +1,1078 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Wed May  6 21:16:11 2020
+
+@author: ninguem
+"""
+from math import log2, ceil
+import matplotlib.pyplot as plt
+import numpy as np
+from copy import deepcopy
+import re
+import time
+import sys
+from utils import *
+from classes import *
+
+
+
+
+
+
+
+class Node:
+    def __init__(self, sw = None, se = None, nw = None, ne = None, depth = 0, isCanonical = False):
+        self.isCanonical = isCanonical
+        self.depth = depth
+        self.sw = sw
+        self.se = se
+        self.nw = nw
+        self.ne = ne
+        self.area = 0
+        if type(sw) == type(self):
+            self.area = sw.area + se.area + nw.area + ne.area
+        if type(sw) == type(0):
+            self.area = sw + se + nw + ne
+        
+    def __eq__(self, node):
+        return id(self.sw) == id(node.sw)  and  id(self.se) == id(node.se) and id(self.nw) == id(node.nw) and id(self.ne) == id(node.ne)
+
+    def __ne__(self, node):
+        return not self.__eq__(node)
+
+    def __hash__(self):
+        return id(self.sw) + id(self.se) + id(self.nw) + id(self.ne)
+        
+    
+        
+    
+    
+    
+class HashLife:
+    def __init__(self):
+            
+
+        # CN1:       CN2:        CN3:       CN4: 
+        #      . .        . x        x .        x x
+        #      . .        . .        . .        . .
+        # CN5:       CN6:        CN7:       CN8: 
+        #      . .        . x        x .        x x
+        #      . x        . x        . x        . x
+        # CN9:       CN10:       CN11:      CN12: 
+        #      . .        . x        x .        x x
+        #      x .        x .        x .        x .
+        # CN13:      CN14:       CN15:      CN16: 
+        #      . .        . x        x .        x x
+        #      x x        x x        x x        x x
+        
+        
+        
+        self.CN1 = Node(0,0,0,0, 1,True)
+        self.CN2 = Node(0,0,0,1, 1,True)
+        self.CN3 = Node(0,0,1,0, 1,True)
+        self.CN4 = Node(0,0,1,1, 1,True)
+        self.CN5 = Node(0,1,0,0, 1,True)
+        self.CN6 = Node(0,1,0,1, 1,True)
+        self.CN7 = Node(0,1,1,0, 1,True)
+        self.CN8 = Node(0,1,1,1, 1,True)
+        self.CN9 = Node(1,0,0,0, 1,True)
+        self.CN10 = Node(1,0,0,1, 1,True)
+        self.CN11 = Node(1,0,1,0, 1,True)
+        self.CN12 = Node(1,0,1,1, 1,True)
+        self.CN13 = Node(1,1,0,0, 1,True)
+        self.CN14 = Node(1,1,0,1, 1,True)
+        self.CN15 = Node(1,1,1,0, 1,True)
+        self.CN16 = Node(1,1,1,1, 1,True)
+        
+        self.CNList = [CN1, CN2, CN3, CN4, CN5, CN6, CN7, CN8, CN9, CN10, CN11, CN12, CN13, CN14, CN15, CN16]
+        
+        
+        self.CM = [[0,0,0,0,0,0],
+              [0,0,0,0,0,0],
+              [0,0,0,0,0,0],
+              [0,0,0,0,0,0],
+              [0,0,0,0,0,0],
+              [0,0,0,0,0,0]]
+        
+        
+        self.CMr = [[0,0,0,0,0,0],
+              [0,0,0,0,0,0],
+              [0,0,0,0,0,0],
+              [0,0,0,0,0,0],
+              [0,0,0,0,0,0],
+              [0,0,0,0,0,0]]
+        
+
+
+
+
+
+
+
+    def pickCanonical(self, sw, se, nw, ne):
+        
+        sw = 1 if sw == 1 else 0
+        se = 1 if se == 1 else 0
+        nw = 1 if nw == 1 else 0
+        ne = 1 if ne == 1 else 0
+        
+        for CNCandidate in self.CNList:
+            if sw == CNCandidate.sw and se == CNCandidate.se and nw == CNCandidate.nw and ne == CNCandidate.ne:
+                CN = CNCandidate
+        
+        return CN
+
+
+
+
+
+
+
+
+    def generateCanonical0(self, depth):
+        
+        n1 = self.CN1
+        for i in range(2,depth+1):
+            n1 = Node(n1, n1, n1, n1, i)
+        
+        return n1
+
+
+
+
+
+
+
+
+
+
+
+    def addBorder(self, node):
+        
+        depth = node.depth
+        
+        nodeBorder = self.generateCanonical0(depth-1)
+        
+        
+        resSW = Node(nodeBorder, nodeBorder, nodeBorder, node.sw, depth)
+        resSE = Node(nodeBorder, nodeBorder, node.se, nodeBorder, depth)
+        resNW = Node(nodeBorder, node.nw, nodeBorder, nodeBorder, depth)
+        resNE = Node(node.ne, nodeBorder, nodeBorder, nodeBorder, depth)
+    
+        
+    
+        return Node(resSW, resSE, resNW, resNE, depth+1)
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def openMcFile(fileName):
+        
+        def lineToMatrix(line):
+            M = [[0 for x in range(8)] for y in range(8)]
+            pixelLines = line.split('$')
+            for pixelLine,j in zip(pixelLines, range(8)):
+                i = 0
+                for pixel in pixelLine:
+                    M[j][i] = 1 if pixel == '*' else 0
+                    i += 1
+            
+            return M
+        
+        
+        
+        def matrixToNode(M, memo):
+            subNodes = []
+            
+            for i in range(4):
+                for j in range(4):
+                    sw = M[len(M)-1-2*i-0][2*j+0]
+                    se = M[len(M)-1-2*i-0][2*j+1]
+                    nw = M[len(M)-1-2*i-1][2*j+0]
+                    ne = M[len(M)-1-2*i-1][2*j+1]
+                    
+                    subNodes.append( pickCanonical(sw, se, nw, ne) )
+    
+            SW = Node(subNodes[0], subNodes[1], subNodes[4], subNodes[5], 2)
+            SE = Node(subNodes[2], subNodes[3], subNodes[6], subNodes[7], 2)
+            NW = Node(subNodes[8], subNodes[9], subNodes[12],subNodes[13], 2)
+            NE = Node(subNodes[10], subNodes[11], subNodes[14], subNodes[15], 2)
+    
+            node = Node(SW, SE, NW, NE, 3)
+    
+            # apparently this is not necessary because the mc files is already
+            # memoized and the generate 0 node already compresses by using 
+            # n1, n1, n1, n1 repeated
+            #
+            # if node in memo:
+            #     node = memo[node]
+            # else:
+            #     memo[node] = node
+    
+    
+            return node
+    
+    
+        memo = {}
+        
+        fid = open(fileName, "rt")
+    
+    
+        NODES = {}
+        idx = 1
+        
+        NODES[0] = generateCanonical0(3)
+    
+    
+        keepGoing = True
+        while keepGoing:
+            
+            
+            line = fid.readline()
+            
+            if len(line)>0:
+            
+                if line[0] != '#' and line[0] != '[':
+                    if line[0] == '.' or line[0] == '*' or line[0] == '$':
+                        M = lineToMatrix(line)
+                        
+                        node = matrixToNode(M, memo)
+                        
+                    else:
+                        
+                        v = [int(x) for x in line.split(' ')]
+                        
+                        # v[0] = depth
+                        # v[1..4] = northwest, northeast, southwest, southeast
+                        
+                        if v[0] == 1:
+                            node = pickCanonical(v[3], v[4], v[1], v[2])
+                                
+                        else:
+                        
+                            SW = NODES[v[3]] if v[3] != 0 else generateCanonical0(v[0]-1)
+                            SE = NODES[v[4]] if v[4] != 0 else generateCanonical0(v[0]-1)
+                            NW = NODES[v[1]] if v[1] != 0 else generateCanonical0(v[0]-1)
+                            NE = NODES[v[2]] if v[2] != 0 else generateCanonical0(v[0]-1)
+                            
+                            
+                            node = Node( SW, SE, NW, NE, v[0])
+    
+    
+                        
+                    # apparently this is not necessary because the mc files is already
+                    # memoized and the generate 0 node already compresses by using 
+                    # n1, n1, n1, n1 repeated
+                    #
+                    # if node in memo:
+                    #     node = memo[node]
+                    # else:
+                    #     memo[node] = node
+                        
+                        
+                    NODES[idx] = node
+                       
+                    idx += 1
+                        
+            else:
+                keepGoing = False
+            
+        fid.close()
+    
+    
+    
+    
+        res = NODES[idx-1]
+    
+        # depth = res.depth
+        
+        # nodeBorder = generateCanonical0(depth-1)
+    
+        # # this bit here is not necessary because the generate 0 node already
+        # # repeats the pointer n1, n1, n1, n1, so its always compressed
+        # #
+        # # if nodeBorder in memo:
+        # #     nodeBorder = memo[nodeBorder]
+    
+        # resSW = Node(nodeBorder, nodeBorder, nodeBorder, res.sw, depth)
+        # resSE = Node(nodeBorder, nodeBorder, res.se, nodeBorder, depth)
+        # resNW = Node(nodeBorder, res.nw, nodeBorder, nodeBorder, depth)
+        # resNE = Node(res.ne, nodeBorder, nodeBorder, nodeBorder, depth)
+    
+        
+    
+        # return Node(resSW, resSE, resNW, resNE, depth+1)
+        
+        return addBorder(addBorder(res))
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def openLifFile(fileName, padding=10):
+    fid = open(fileName, "rt")
+
+    coords = []
+    patterns = []
+
+    keepGoing = True
+    while keepGoing:
+        
+        line = fid.readline()
+        if re.search('#P',line) != None:
+            coordsList = [int(x) for x in re.findall('-*[0-9]+',line)]
+            if coords != None:
+                coords.append((coordsList[0], coordsList[1]))
+                patternTemp = []
+                patternState = True
+                while patternState:
+                    x = fid.tell()
+                    line = fid.readline()
+                    if len(line) == 0:
+                        patternState = False
+                        keepGoing = False
+                    else:
+                        if line[0] != '#':
+                            patternTemp.append(line)    
+                        else:
+                            fid.seek(x)
+                            patternState = False
+                patterns.append(patternTemp)
+                
+                
+        if line == '':
+            keepGoing = False
+        
+        
+    
+    fid.close()
+
+
+    minX = coords[0][0]
+    maxX = coords[0][0]
+    minY = coords[0][1]
+    maxY = coords[0][1]
+    for coord, pattern in zip(coords, patterns):
+
+        patternLengthX = len(pattern[0])
+        for patternLine in pattern:
+            if len(patternLine) > patternLengthX:
+                patternLengthX = len(patternLine)
+        patternLengthY = len(pattern)
+        
+        x1 = coord[0]
+        x2 = coord[0]+patternLengthX
+        
+        y1 = coord[1]
+        y2 = coord[1]+patternLengthY
+        
+        
+        if x2>maxX:
+            maxX = x2
+        if y2>maxY:
+            maxY = y2
+
+        if x1<minX:
+            minX = x1
+        if y1<minY:
+            minY = y1
+
+
+
+    MSize = max( [ maxX-minX, maxY-minY  ] )+2*padding
+
+    M = [[0 for i in range(MSize)] for j in range(MSize)]
+
+    newCoords = []
+    for coord in coords:
+        newCoords.append( (padding+coord[0] - minX, padding+coord[1] - minY) )
+
+
+    for newCoord, pattern in zip(newCoords, patterns):
+        
+        for patternLine, j in zip(pattern, range(len(pattern))):
+            for pixel, i in zip(patternLine, range(len(patternLine))):
+                if pixel == '*':
+                    M[newCoord[1]+j][newCoord[0]+i] = 1
+
+
+
+    return M
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+    
+
+
+
+def nodify(M):
+    
+    def recurseCreate(M, corner, depth, originalDepth, memo):
+
+        parentNode = Node()
+        
+        MPosition = 2**(originalDepth-1) - int(len(M)/2)
+        
+        halfLen = 2**(depth-1)
+        c1 = (corner[0]+0,corner[1]+0)
+        c2 = (corner[0]+halfLen,corner[1]+0)
+        c3 = (corner[0]+0,corner[1]+halfLen)
+        c4 = (corner[0]+halfLen,corner[1]+halfLen)
+
+        if depth == 2:
+        
+            superCs = [c1, c2, c3, c4]
+            
+            for superC, i in zip(superCs, [1, 2, 3, 4]):
+        
+                cl1 = (superC[0] - MPosition + 0, superC[1] - MPosition + 0)
+                cl2 = (superC[0] - MPosition + 1, superC[1] - MPosition + 0)
+                cl3 = (superC[0] - MPosition + 0, superC[1] - MPosition + 1)
+                cl4 = (superC[0] - MPosition + 1, superC[1] - MPosition + 1)
+
+                m1 = M[len(M)-cl1[1]-1][cl1[0]] if cl1[0] >=0 and cl1[0] < len(M) and cl1[1] >=0 and cl1[1] < len(M) else 0
+                m2 = M[len(M)-cl2[1]-1][cl2[0]] if cl2[0] >=0 and cl2[0] < len(M) and cl2[1] >=0 and cl2[1] < len(M) else 0
+                m3 = M[len(M)-cl3[1]-1][cl3[0]] if cl3[0] >=0 and cl3[0] < len(M) and cl3[1] >=0 and cl3[1] < len(M) else 0
+                m4 = M[len(M)-cl4[1]-1][cl4[0]] if cl4[0] >=0 and cl4[0] < len(M) and cl4[1] >=0 and cl4[1] < len(M) else 0
+    
+
+                CN = pickCanonical(m1, m2, m3, m4)
+
+    
+            
+                parentNode.depth = 2
+                parentNode.sw = CN if i == 1 else parentNode.sw
+                parentNode.se = CN if i == 2 else parentNode.se
+                parentNode.nw = CN if i == 3 else parentNode.nw
+                parentNode.ne = CN if i == 4 else parentNode.ne
+
+                
+            parentNode.area = parentNode.sw.area + parentNode.se.area + parentNode.nw.area + parentNode.ne.area
+
+            if parentNode in memo:
+                parentNode = memo[parentNode]
+            else:
+                memo[parentNode] = parentNode
+
+
+        else:
+
+            node1 = recurseCreate(M, c1, depth-1, originalDepth, memo)
+            node2 = recurseCreate(M, c2, depth-1, originalDepth, memo)
+            node3 = recurseCreate(M, c3, depth-1, originalDepth, memo)
+            node4 = recurseCreate(M, c4, depth-1, originalDepth, memo)
+       
+            parentNode.depth = depth
+            parentNode.sw = node1
+            parentNode.se = node2
+            parentNode.nw = node3
+            parentNode.ne = node4
+        
+        
+            parentNode.area = parentNode.sw.area + parentNode.se.area + parentNode.nw.area + parentNode.ne.area
+    
+            if parentNode in memo:
+                parentNode = memo[parentNode]
+            else:
+                memo[parentNode] = parentNode
+            
+            
+        return parentNode
+    
+    memo = {}
+    
+    depth = ceil(log2(len(M)))+1
+    
+    rootNode = recurseCreate(M, (0,0), depth, depth, memo)
+    
+    return rootNode
+
+
+
+
+
+
+
+
+
+
+def processMatrix():
+    
+    
+    for i in range(1,len(CM)-1):
+        for j in range(1,len(CM)-1):
+            n1 = CM[i-1][j-1]
+            n2 = CM[i][j-1]
+            n3 = CM[i+1][j-1]
+            n4 = CM[i+1][j]
+            n5 = CM[i+1][j+1]
+            n6 = CM[i][j+1]
+            n7 = CM[i-1][j+1]
+            n8 = CM[i-1][j]
+        
+            res = CM[i][j]
+    
+            nAlive = n1 + n2 + n3 + n4 + n5 + n6 + n7 + n8
+            if nAlive < 2 or nAlive > 3:
+                res = 0
+            else:
+                if nAlive == 3:
+                    res = 1
+
+            
+            CMr[i][j] = res
+
+
+
+
+
+def stepNode(node, memoRes = None, memoNodes = None):
+
+    if memoRes == None:    
+        memoRes = {}
+
+    if memoNodes == None:    
+        memoNodes = {}
+
+    if node.area == 0:
+        return node
+
+
+    if node in memoRes:
+        return memoRes[node]
+
+    
+    if node.depth == 3:
+
+        # +-----+-----+-----+-----+-----+-----+-----+-----+
+        # |     |     |     |     |     |     |     |     |
+        # |           |           |           |           |
+        # +-    +    -+-    +    -+-    +    -+-    +    -+
+        # |           |           |           |           |
+        # |     |     |     |     |     |     |     |     |
+        # +-----+-----+-----+-----+-----+-----+-----+-----+
+        # |     |     |     |     |     |     |     |     |
+        # |           | s41 | s42 | s43 | s44 |     |     |
+        # +-    +    -+-----+-----+-----+-----+-    +    -+
+        # |           |     |     |     |     |           |
+        # |     |     | s31 | s32 | s33 | s34 |     |     |
+        # +-----+-----+-----+-----+-----+-----+-----+-----+
+        # |     |     |     |     |     |     |     |     |
+        # |           | s21 | s22 | s23 | s24 |           |
+        # +-    +    -+-----+----+------+-----+-    +    -+
+        # |           |     |     |     |     |           |
+        # |     |     | s11 | s12 | s13 | s14 |     |     |
+        # +-----+-----+-----+-----+-----+-----+-----+-----+
+        # |     |     |     |     |     |     |     |     |
+        # |           |           |           |           |
+        # +-    +    -+-    +    -+-    +    -+-    +    -+
+        # |           |           |           |           |
+        # |     |     |     |     |     |     |     |     |
+        # +-----+-----+-----+-----+-----+-----+-----+-----+
+
+        SW = node.sw
+        SE = node.se
+        NW = node.nw
+        NE = node.ne
+
+        CM[0][0] = SW.sw.ne
+        CM[0][1] = SW.se.nw
+        CM[0][2] = SW.se.ne
+        CM[0][3] = SE.sw.nw
+        CM[0][4] = SE.sw.ne
+        CM[0][5] = SE.se.nw
+        
+        CM[1][0] = SW.nw.se
+        CM[1][1] = SW.ne.sw
+        CM[1][2] = SW.ne.se
+        CM[1][3] = SE.nw.sw
+        CM[1][4] = SE.nw.se
+        CM[1][5] = SE.ne.sw
+        
+        CM[2][0] = SW.nw.ne
+        CM[2][1] = SW.ne.nw
+        CM[2][2] = SW.ne.ne
+        CM[2][3] = SE.nw.nw
+        CM[2][4] = SE.nw.ne
+        CM[2][5] = SE.ne.nw
+        
+        CM[3][0] = NW.sw.se
+        CM[3][1] = NW.se.sw
+        CM[3][2] = NW.se.se
+        CM[3][3] = NE.sw.sw
+        CM[3][4] = NE.sw.se
+        CM[3][5] = NE.se.sw
+
+        CM[4][0] = NW.sw.ne
+        CM[4][1] = NW.se.nw
+        CM[4][2] = NW.se.ne
+        CM[4][3] = NE.sw.nw
+        CM[4][4] = NE.sw.ne
+        CM[4][5] = NE.se.nw
+
+        CM[5][0] = NW.nw.se
+        CM[5][1] = NW.ne.sw
+        CM[5][2] = NW.ne.se
+        CM[5][3] = NE.nw.sw
+        CM[5][4] = NE.nw.se
+        CM[5][5] = NE.ne.sw
+
+
+        processMatrix()
+
+
+        sw = pickCanonical(CMr[1][1], CMr[1][2], CMr[2][1], CMr[2][2])
+        se = pickCanonical(CMr[1][3], CMr[1][4], CMr[2][3], CMr[2][4])
+        nw = pickCanonical(CMr[3][1], CMr[3][2], CMr[4][1], CMr[4][2])
+        ne = pickCanonical(CMr[3][3], CMr[3][4], CMr[4][3], CMr[4][4])
+        
+        
+        node_sw = Node(SW.sw, SW.se, SW.nw,    sw, 2)
+        node_se = Node(SE.sw, SE.se,    se, SE.ne, 2)
+        node_nw = Node(NW.sw,    nw, NW.nw, NW.ne, 2)
+        node_ne = Node(   ne, NE.se, NE.nw, NE.ne, 2)
+
+
+        result = Node(node_sw, node_se, node_nw, node_ne, 3)
+
+    else:
+        
+        #   +------+--+------+--+------+
+        #   |      |  |      |  |      |            
+        #   |  n31 |  | n32  |  |  n33 |
+        #   |      |  |      |  |      |            
+        #   +------+--+------+--+------+
+        #   |      |  |      |  |      | 
+        #   +------+--+------+--+------+
+        #   |      |  |      |  |      |            
+        #   |  n21 |  | n22  |  | n23  |
+        #   |      |  |      |  |      |            
+        #   +------+--+------+--+------+
+        #   |      |  |      |  |      | 
+        #   +------+--+------+--+------+
+        #   |      |  |      |  |      |            
+        #   |  n11 |  | n12  |  | n13  |
+        #   |      |  |      |  |      |            
+        #   +------+--+------+--+------+
+        
+        
+        SW = node.sw
+        SE = node.se
+        NW = node.nw
+        NE = node.ne        
+        
+        node11 = Node(node.sw.sw, node.sw.se, node.sw.nw, node.sw.ne, node.depth-1)
+        node21 = Node(node.sw.nw, node.sw.ne, node.nw.sw, node.nw.se, node.depth-1)
+        node31 = Node(node.nw.sw, node.nw.se, node.nw.nw, node.nw.ne, node.depth-1)
+    
+        node12 = Node(node.sw.se, node.se.sw, node.sw.ne, node.se.nw, node.depth-1)
+        node22 = Node(node.sw.ne, node.se.nw, node.nw.se, node.ne.sw, node.depth-1)
+        node32 = Node(node.nw.se, node.ne.sw, node.nw.ne, node.ne.nw, node.depth-1)
+        
+        node13 = Node(node.se.sw, node.se.se, node.se.nw, node.se.ne, node.depth-1)
+        node23 = Node(node.se.nw, node.se.ne, node.ne.sw, node.ne.se, node.depth-1)
+        node33 = Node(node.ne.sw, node.ne.se, node.ne.nw, node.ne.ne, node.depth-1)
+        
+        res11 = stepNode(node11, memoRes, memoNodes)
+        res12 = stepNode(node12, memoRes, memoNodes)
+        res13 = stepNode(node13, memoRes, memoNodes)
+        res21 = stepNode(node21, memoRes, memoNodes)
+        res22 = stepNode(node22, memoRes, memoNodes)
+        res23 = stepNode(node23, memoRes, memoNodes)
+        res31 = stepNode(node31, memoRes, memoNodes)
+        res32 = stepNode(node32, memoRes, memoNodes)
+        res33 = stepNode(node33, memoRes, memoNodes)
+    
+        # +------------------------+
+        # |                        |
+        # |    +---+---+---+---+   |
+        # |    |s41|s42|s43|s44|   |
+        # |    +---+---+---+---+   |
+        # |    |s31|s32|s33|s34|   |
+        # |    +---+---+---+---+   |
+        # |    |s21|s22|s23|s24|   |
+        # |    +---+---+---+---+   |
+        # |    |s11|s12|s13|s14|   |
+        # |    +---+---+---+---+   |
+        # |                        |
+        # +------------------------+
+        
+        sub11 = res11.ne.sw
+        sub12 = res12.nw.se
+        sub13 = res12.ne.sw
+        sub14 = res13.nw.se
+        
+        sub21 = res21.se.nw
+        sub22 = res22.sw.ne
+        sub23 = res22.se.nw
+        sub24 = res23.sw.ne
+        
+        sub31 = res21.ne.sw
+        sub32 = res22.nw.se
+        sub33 = res22.ne.sw
+        sub34 = res23.nw.se
+
+        sub41 = res31.se.nw
+        sub42 = res32.sw.ne
+        sub43 = res32.se.nw
+        sub44 = res33.sw.ne 
+    
+        sw = Node( sub11, sub12, sub21, sub22, node.depth-2)
+        se = Node( sub13, sub14, sub23, sub24, node.depth-2)
+        nw = Node( sub31, sub32, sub41, sub42, node.depth-2)
+        ne = Node( sub33, sub34, sub43, sub44, node.depth-2)
+
+        if sw in memoNodes:
+            sw = memoNodes[sw]
+        else:
+            memoNodes[sw] = sw
+        if se in memoNodes:
+            se = memoNodes[se]
+        else:
+            memoNodes[se] = se
+        if nw in memoNodes:
+            nw = memoNodes[nw]
+        else:
+            memoNodes[nw] = nw
+        if ne in memoNodes:
+            ne = memoNodes[ne]
+        else:
+            memoNodes[ne] = ne
+
+
+        node_sw = Node(SW.sw, SW.se, SW.nw,    sw, node.depth-1)
+        node_se = Node(SE.sw, SE.se,    se, SE.ne, node.depth-1)
+        node_nw = Node(NW.sw,    nw, NW.nw, NW.ne, node.depth-1)
+        node_ne = Node(   ne, NE.se, NE.nw, NE.ne, node.depth-1)
+
+
+        if node_sw in memoNodes:
+            node_sw = memoNodes[node_sw]
+        else:
+            memoNodes[node_sw] = node_sw
+        if node_se in memoNodes:
+            node_se = memoNodes[node_se]
+        else:
+            memoNodes[node_se] = node_se
+        if node_nw in memoNodes:
+            node_nw = memoNodes[node_nw]
+        else:
+            memoNodes[node_nw] = node_nw
+        if node_ne in memoNodes:
+            node_ne = memoNodes[node_ne]
+        else:
+            memoNodes[node_ne] = node_ne
+
+
+        
+        result = Node(node_sw, node_se, node_nw, node_ne, node.depth)
+
+
+    if result in memoNodes:
+        result = memoNodes[result]
+    else:
+        memoNodes[result] = result
+        
+
+    memoRes[node] = result
+    
+    
+    return result
+
+
+# def recenterNode(node):
+#     swZeros = 0
+#     subNode = node.sw
+#     while subNode.depth >= 1 and subNode.area != 0:
+#         subNode = subNode.sw
+#         swZeros += 1
+
+        
+#     seZeros = 0
+#     subNode = node.se
+#     while subNode.depth >= 1 and subNode.area != 0:
+#         subNode = subNode.se
+#         seZeros += 1
+
+#     nwZeros = 0
+#     subNode = node.nw
+#     while subNode.depth >= 1 and subNode.area != 0:
+#         subNode = subNode.nw
+#         nwZeros += 1
+
+#     neZeros = 0
+#     subNode = node.ne
+#     while subNode.depth >= 1 and subNode.area != 0:
+#         subNode = subNode.ne
+#         neZeros += 1
+
+#     print(swZeros, seZeros, nwZeros, neZeros)
+
+
+
+
+
+
+
+
+def node2matrix(node, minDepth = 0):
+    
+
+    def recurse(node, corner, U, minDepth):
+        depth = node.depth-minDepth
+
+        m1 = 1
+        m2 = 0
+
+        if minDepth != 0:
+        
+        
+            if node.depth == minDepth and minDepth > 0:
+                U[corner[1]][corner[0]] = node.area
+
+                
+            else:
+                recurse(node.sw, (corner[0]               , corner[1]               ), U, minDepth)
+                recurse(node.se, (corner[0] + 2**(depth-1), corner[1]               ), U, minDepth)
+                recurse(node.nw, (corner[0]               , corner[1] + 2**(depth-1)), U, minDepth)
+                recurse(node.ne, (corner[0] + 2**(depth-1), corner[1] + 2**(depth-1)), U, minDepth)
+            
+        else:
+            
+            if node.isCanonical or node.depth == 1:
+                if node.sw == 1:
+                    U[corner[1]][corner[0]] = m1
+                else:
+                    U[corner[1]][corner[0]] = m2
+                        
+                    
+                if node.se == 1:
+                    U[corner[1]][corner[0]+1] = m1
+                else:
+                    U[corner[1]][corner[0]+1] = m2
+                    
+                if node.nw == 1:
+                    U[corner[1]+1][corner[0]] = m1
+                else:
+                    U[corner[1]+1][corner[0]] = m2
+                        
+                    
+                if node.ne == 1:
+                    U[corner[1]+1][corner[0]+1] = m1
+                else:
+                    U[corner[1]+1][corner[0]+1] = m2
+                    
+            else:
+                recurse(node.sw, (corner[0]               , corner[1]               ), U, minDepth)
+                recurse(node.se, (corner[0] + 2**(depth-1), corner[1]               ), U, minDepth)
+                recurse(node.nw, (corner[0]               , corner[1] + 2**(depth-1)), U, minDepth)
+                recurse(node.ne, (corner[0] + 2**(depth-1), corner[1] + 2**(depth-1)), U, minDepth)
+
+
+    s = 2**(node.depth-minDepth)
+    U = [[0]*s for i in range(s)]
+    recurse(node, (0,0), U, minDepth)
+
+
+    return U
+
+
+def printNode(node, full = True):
+
+    if full:
+        U = node2matrix(node)
+    else:
+        U = node2matrix(Node(node.sw.ne, node.se.nw, node.nw.se, node.ne.sw,  node.depth-1))
+
+    strRes = ''
+    U.reverse()
+    for u in U:
+        for v in u:
+            strRes += '@' if v == 1 else '.'
+        strRes += '\n'
+    
+
+    print(strRes)
+
+
+
+
+def drawNode(node, full = False, minDepth = 0):
+
+    
+    if full:
+        U = node2matrix(node, minDepth)
+    else:
+        U = node2matrix(Node(node.sw.ne, node.se.nw, node.nw.se, node.ne.sw,  node.depth-1), minDepth)
+        
+
+    U.reverse()
+
+    plt.imshow(U)
+
+
+    plt.show(block=False)
+
+    plt.pause(0.01)
+
+
+
+def countPixels(node):
+    
+    
+    def recurse(node, counter, memo):
+        if node in memo:
+            return memo[node]
+            
+        if node.depth == 1:
+            res = node.sw + node.se + node.nw + node.ne
+            memo[node] = res
+            return res
+        
+        res = counter + recurse(node.sw, counter, memo) + recurse(node.se, counter, memo) + recurse(node.nw, counter, memo) + recurse(node.ne, counter, memo)
+    
+        memo[node] = res
+        
+        return res
+
+    memo = {}
+    res = recurse(node, 0, memo)
+
+    return res
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+F = plt.figure()
+
+
+
+M0 = [[0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0]]
+M = [[1, 1, 1, 1, 1, 1, 1, 1],
+     [1, 0, 0, 0, 0, 0, 0, 1],
+     [1, 0, 0, 0, 0, 0, 0, 1],
+     [1, 0, 0, 0, 0, 0, 0, 1],
+     [1, 0, 0, 0, 0, 0, 0, 1],
+     [1, 0, 0, 0, 0, 0, 0, 1],
+     [1, 0, 0, 0, 0, 0, 0, 1],
+     [1, 1, 1, 1, 1, 1, 1, 1]]
+M = [x+x+x+x+x for x in M0] + [x[0] + x[1] + x[0] + x[1] + x[0] for x in zip(M0, M)] + [x+x+x+x+x for x in M0] + [x[0] + x[1] + x[0] + x[1] + x[0] for x in zip(M0, M)] + [x+x+x+x+x for x in M0]
+rootNode = nodify(M)
+
+
+
+M = [[0, 0, 0, 0, 0, 0, 0, 0],
+     [0, 0, 0, 0, 1, 0, 0, 0],
+     [0, 0, 0, 1, 0, 0, 0, 0],
+     [0, 0, 0, 1, 1, 1, 0, 0],
+     [0, 0, 0, 0, 0, 0, 0, 0],
+     [0, 0, 0, 0, 0, 0, 0, 0],
+     [0, 0, 0, 0, 0, 0, 0, 0],
+     [0, 0, 0, 0, 0, 0, 0, 0]]
+rootNode = nodify(M)
+
+
+
+
+
+# printNode(node)
+
+
+#M = openLifFile('sample.lif')
+
+
+
+a = time.time()
+#rootNode = openMcFile('c5-adjustable-rake.mc')
+rootNode = openMcFile('metapixel-galaxy.mc')
+#rootNode = openMcFile('oscilator1.mc')
+#rootNode = openMcFile('sample.mc')
+#rootNode = openMcFile('extensible-low-period.mc')
+print('%.4fs'%(time.time()-a))
+
+ 
+print('%d bytes'%(get_size(rootNode)))
+
+# a = time.time()
+# print(countPixels(rootNode))   
+# print('%.4fs'%(time.time()-a))
+
+memoRes = {}
+memoNodes = {}
+
+for i in range(100):
+    rootNode = stepNode(rootNode, memoRes, memoNodes)
+    minDepth = rootNode.depth - 8 if rootNode.depth >=8 else 0
+    drawNode(rootNode, False, minDepth)
+    print(len(memoNodes), len(memoRes))
+    
+
+
