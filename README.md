@@ -4,7 +4,7 @@ Python program that implements the Hashlife algorithm
 
 See blog post for details
 
-https://www.allan666.net/hashlife/
+https://dev-mind.blog/hashlife/
 
 ## Software
 
