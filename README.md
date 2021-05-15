@@ -24,4 +24,4 @@ Usage: python hashlife.py
 
 ## links
 
-https://www.allan666.net/hashlife/
+https://dev-mind.blog/hashlife/
